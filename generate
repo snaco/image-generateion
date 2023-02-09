@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+
+from datetime import datetime
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler, DiffusionPipeline
+from time import sleep
+import os
+import re
+import subprocess
+import sys
+import torch
+
+# Use the DPMSolverMultistepScheduler (DPM-Solver++) scheduler here instead
+
+# pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
+# pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-inpainting", torch_dtype=torch.float16)
+# pipe = DiffusionPipeline.from_pretrained("nitrosocke/elden-ring-diffusion", torch_dtype=torch.float16)
+# pipe = DiffusionPipeline.from_pretrained("johnslegers/epic-diffusion-v1.1", torch_dtype=torch.float16)
+# pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-diffusion-1.0", torch_dtype=torch.float16)
+# pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-photoreal-2.0", torch_dtype=torch.float16)
+pipe = DiffusionPipeline.from_pretrained("darkstorm2150/Protogen_Infinity_Official_Release", torch_dtype=torch.float16)
+# pipe = DiffusionPipeline.from_pretrained("nitrosocke/Nitro-Diffusion")
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+pipe = pipe.to("cuda")
+
+launch_time = datetime.now().strftime("%H:%M:%S")
+launch_date = datetime.now().strftime("%Y-%m-%d")
+
+bash_command = "nvidia-smi -q -d temperature"
+r = re.compile('GPUCurrentTemp')
+
+args = sys.argv
+do_cooldown = True
+
+def argsHasFlag(args, flag):
+  return len(list(filter(lambda x: x == flag, args))) > 0
+
+if (argsHasFlag(args, '--no-cooldown')):
+  args.remove('--no-cooldown')
+  do_cooldown = False
+
+prompts = args[1:-1]
+max = args[-1]
+
+def get_temp() -> int:
+  with (subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)) as process:
+    output, error = process.communicate()
+    lines = str(output).split('\\n')
+    lines = list(map(lambda x: x.replace(' ', ''), lines))
+    return int(list(filter(r.match, lines))[0].split(':')[1][:-1])
+
+dir_index = 0
+for prompt in prompts:
+  path_index = f'/{dir_index}' if len(prompts) > 1 else ''
+  prompt_file = f"./output/{launch_date}/{launch_time}{path_index}/prompt.txt"
+  os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
+  with open(f'{prompt_file}', 'w') as f:
+      f.write(prompt)
+  for index in range(1, int(max)+1):
+    nvidia_temp = get_temp()
+    print(f'GPU Temp: {nvidia_temp}ºC')
+    if (do_cooldown and nvidia_temp > 75):
+      print('Pausing to cool down.')
+      while (nvidia_temp > 70):
+        time = datetime.now().strftime("%H:%M:%S")
+        sleep(5)
+        nvidia_temp = get_temp()
+        print(f'[{time}] Temp: {nvidia_temp}ºC')
+      print(f'Temp: {nvidia_temp}ºC')
+      print('Resuming.')
+    image = pipe(prompt, height=504, width=896).images[0]
+    
+    file_name = f"./output/{launch_date}/{launch_time}{path_index}/{index}.png"
+    os.makedirs(os.path.dirname(file_name), exist_ok=True)
+    image.save(f"{file_name}")
+  dir_index = dir_index + 1
