@@ -14,6 +14,8 @@ pip install diffusers transformers accelerate scipy safetensors torch xformers
     
     The `--no-cooldown` option is used to stop the script from checking the gpu temperature before generating. Without this flag the script will pause execution if the temperature is over 75ºC after generating an image. It will wait until the temperature is at 65ºC before resuming generation.
 
+    You can specify the resolution with `--height <number>` and `width <number>`. When not specified these default to `512`.
+
     You can specify a diffuser with `--diffuser <diffuser_name>` where `diffuser_name` can be:
     * `sd2` - stabilityai/stable-diffusion-2-1
     * `er` - nitrosocke/elden-ring-diffusion
@@ -22,7 +24,7 @@ pip install diffusers transformers accelerate scipy safetensors torch xformers
     * `dream2` - dreamlike-art/dreamlike-photoreal-2.0
     * `protogen` - darkstorm2150/Protogen_Infinity_Official_Release
     * `nitro` - nitrosocke/Nitro-Diffusion
-
     When not provided the diffuser defaults to protogen.
+    
 
 * `./temp` - displays the current gpu temperature

@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import torch
+torch.cuda.empty_cache()
 
 launch_time = datetime.now().strftime("%H:%M:%S")
 launch_date = datetime.now().strftime("%Y-%m-%d")
@@ -24,6 +25,18 @@ def get_temp() -> int:
     lines = str(output).split('\\n')
     lines = list(map(lambda x: x.replace(' ', ''), lines))
     return int(list(filter(gpu_temp_regex.match, lines))[0].split(':')[1][:-1])
+
+height=512
+if (argsHasFlag(args, '--height')):
+  arg_index = args.index('--height')
+  height = int(args.pop(arg_index+1))
+  args.pop(arg_index)
+
+width=512
+if (argsHasFlag(args, '--width')):
+  arg_index = args.index('--width')
+  width = int(args.pop(arg_index+1))
+  args.pop(arg_index)
 
 do_cooldown = True
 if (argsHasFlag(args, '--no-cooldown')):
@@ -84,7 +97,7 @@ for prompt in prompts:
           print(f'[{time}] Temp: {nvidia_temp}ºC')
         print(f'Temp: {nvidia_temp}ºC')
         print('Resuming.')
-    image = pipe(prompt, height=504, width=896).images[0]
+    image = pipe(prompt, height=height, width=width).images[0]
     file_name = f"./output/{launch_date}/{launch_time}{path_index}/{index}.png"
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     image.save(f"{file_name}")
