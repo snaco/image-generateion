@@ -9,46 +9,62 @@ import subprocess
 import sys
 import torch
 
-# Use the DPMSolverMultistepScheduler (DPM-Solver++) scheduler here instead
-
-# pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
-# pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-inpainting", torch_dtype=torch.float16)
-# pipe = DiffusionPipeline.from_pretrained("nitrosocke/elden-ring-diffusion", torch_dtype=torch.float16)
-# pipe = DiffusionPipeline.from_pretrained("johnslegers/epic-diffusion-v1.1", torch_dtype=torch.float16)
-# pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-diffusion-1.0", torch_dtype=torch.float16)
-# pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-photoreal-2.0", torch_dtype=torch.float16)
-pipe = DiffusionPipeline.from_pretrained("darkstorm2150/Protogen_Infinity_Official_Release", torch_dtype=torch.float16)
-# pipe = DiffusionPipeline.from_pretrained("nitrosocke/Nitro-Diffusion")
-pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-pipe = pipe.to("cuda")
-
 launch_time = datetime.now().strftime("%H:%M:%S")
 launch_date = datetime.now().strftime("%Y-%m-%d")
-
-bash_command = "nvidia-smi -q -d temperature"
-r = re.compile('GPUCurrentTemp')
-
+nvidia_temp_command = "nvidia-smi -q -d temperature"
+gpu_temp_regex = re.compile('GPUCurrentTemp')
 args = sys.argv
-do_cooldown = True
 
 def argsHasFlag(args, flag):
-  return len(list(filter(lambda x: x == flag, args))) > 0
+  return len(list(filter(lambda x: flag in x, args))) > 0
 
+def get_temp() -> int:
+  with (subprocess.Popen(nvidia_temp_command.split(), stdout=subprocess.PIPE)) as process:
+    output, error = process.communicate()
+    lines = str(output).split('\\n')
+    lines = list(map(lambda x: x.replace(' ', ''), lines))
+    return int(list(filter(gpu_temp_regex.match, lines))[0].split(':')[1][:-1])
+
+do_cooldown = True
 if (argsHasFlag(args, '--no-cooldown')):
   args.remove('--no-cooldown')
   do_cooldown = False
 
+if (argsHasFlag(args, '--diffuser')):
+  diffuser_index = args.index('--diffuser')
+  diffuser = args.pop(diffuser_index+1)
+  args.pop(diffuser_index)
+  if diffuser.lower() == 'sd2':
+    print('using stabilityai/stable-diffusion-2-1')
+    pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
+  elif diffuser.lower() == 'er':
+    print('using nitrosocke/elden-ring-diffusion')
+    pipe = DiffusionPipeline.from_pretrained("nitrosocke/elden-ring-diffusion", torch_dtype=torch.float16)
+  elif diffuser.lower() == 'epic':
+    print('using johnslegers/epic-diffusion-v1.1')
+    pipe = DiffusionPipeline.from_pretrained("johnslegers/epic-diffusion-v1.1", torch_dtype=torch.float16)
+  elif diffuser.lower() == 'dream1':
+    print('using dreamlike-art/dreamlike-diffusion-1.0')
+    pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-diffusion-1.0", torch_dtype=torch.float16)
+  elif diffuser.lower() == 'dream2':
+    print('using dreamlike-art/dreamlike-photoreal-2.0')
+    pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-photoreal-2.0", torch_dtype=torch.float16)
+  elif diffuser.lower() == 'protogen':
+    print('using darkstorm2150/Protogen_Infinity_Official_Release')
+    pipe = DiffusionPipeline.from_pretrained("darkstorm2150/Protogen_Infinity_Official_Release", torch_dtype=torch.float16)
+  elif diffuser.lower() == 'nitro':
+    print('using nitrosocke/Nitro-Diffusion')
+    pipe = DiffusionPipeline.from_pretrained("nitrosocke/Nitro-Diffusion")
+else:
+  print('using darkstorm2150/Protogen_Infinity_Official_Release')
+  pipe = pipe = DiffusionPipeline.from_pretrained("darkstorm2150/Protogen_Infinity_Official_Release", torch_dtype=torch.float16)
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+pipe = pipe.to("cuda")
+
 prompts = args[1:-1]
 max = args[-1]
-
-def get_temp() -> int:
-  with (subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)) as process:
-    output, error = process.communicate()
-    lines = str(output).split('\\n')
-    lines = list(map(lambda x: x.replace(' ', ''), lines))
-    return int(list(filter(r.match, lines))[0].split(':')[1][:-1])
-
 dir_index = 0
+
 for prompt in prompts:
   path_index = f'/{dir_index}' if len(prompts) > 1 else ''
   prompt_file = f"./output/{launch_date}/{launch_time}{path_index}/prompt.txt"
@@ -69,7 +85,6 @@ for prompt in prompts:
         print(f'Temp: {nvidia_temp}ºC')
         print('Resuming.')
     image = pipe(prompt, height=504, width=896).images[0]
-    
     file_name = f"./output/{launch_date}/{launch_time}{path_index}/{index}.png"
     os.makedirs(os.path.dirname(file_name), exist_ok=True)
     image.save(f"{file_name}")
