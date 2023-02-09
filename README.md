@@ -1,5 +1,11 @@
 # Image Generation
 
+## Prerequisites
+
+```
+pip install diffusers transformers accelerate scipy safetensors torch xformers
+```
+
 ## Scripts
 
  * `./generate "prompt1" "prompt2" ... X [--no-cooldown] `
