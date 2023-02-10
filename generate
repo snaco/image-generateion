@@ -38,11 +38,17 @@ if (argsHasFlag(args, '--width')):
   width = int(args.pop(arg_index+1))
   args.pop(arg_index)
 
+upscale=False
+if (argsHasFlag(args, '--upscale')):
+  upscale = True
+  args.remove('--upscale')
+
 do_cooldown = True
 if (argsHasFlag(args, '--no-cooldown')):
   args.remove('--no-cooldown')
   do_cooldown = False
 
+diffuser = ''
 if (argsHasFlag(args, '--diffuser')):
   diffuser_index = args.index('--diffuser')
   diffuser = args.pop(diffuser_index+1)
@@ -98,7 +104,13 @@ for prompt in prompts:
         print(f'Temp: {nvidia_temp}ºC')
         print('Resuming.')
     image = pipe(prompt, height=height, width=width).images[0]
-    file_name = f"./output/{launch_date}/{launch_time}{path_index}/{index}.png"
-    os.makedirs(os.path.dirname(file_name), exist_ok=True)
-    image.save(f"{file_name}")
+    file_name = f"./output/{launch_date}/{launch_time}-{diffuser}{path_index}/{index}"
+    os.makedirs(os.path.dirname(f'{file_name}.png'), exist_ok=True)
+    image.save(f"{file_name}.png")
+    if (upscale):
+      os.makedirs(os.path.dirname(f'{file_name}_4x.png'), exist_ok=True)
+      upscale_command = f"./upscale/realesrgan-ncnn-vulkan -i {file_name}.png -o {file_name}_upscale.png"
+      with (subprocess.Popen(upscale_command.split(), stdout=subprocess.PIPE)) as process:
+        output, error = process.communicate()
+      
   dir_index = dir_index + 1
