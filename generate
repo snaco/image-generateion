@@ -8,11 +8,12 @@ import re
 import subprocess
 import sys
 import torch
-torch.cuda.empty_cache()
+from upscale import upscale, models
+import gc
 
-launch_time = datetime.now().strftime("%H:%M:%S")
-launch_date = datetime.now().strftime("%Y-%m-%d")
-nvidia_temp_command = "nvidia-smi -q -d temperature"
+launch_time = datetime.now().strftime('%H:%M:%S')
+launch_date = datetime.now().strftime('%Y-%m-%d')
+nvidia_temp_command = 'nvidia-smi -q -d temperature'
 gpu_temp_regex = re.compile('GPUCurrentTemp')
 args = sys.argv
 
@@ -26,21 +27,32 @@ def get_temp() -> int:
     lines = list(map(lambda x: x.replace(' ', ''), lines))
     return int(list(filter(gpu_temp_regex.match, lines))[0].split(':')[1][:-1])
 
-height=512
+height=None
 if (argsHasFlag(args, '--height')):
   arg_index = args.index('--height')
   height = int(args.pop(arg_index+1))
   args.pop(arg_index)
 
-width=512
+width=None
 if (argsHasFlag(args, '--width')):
   arg_index = args.index('--width')
   width = int(args.pop(arg_index+1))
   args.pop(arg_index)
 
-upscale=False
+count=1
+if argsHasFlag(args, '--count'):
+  arg_index = args.index('--count')
+  count = int(args.pop(arg_index+1))
+  args.pop(arg_index)
+
+wide=False
+if (argsHasFlag(args, '--wide')):
+  args.remove('--wide')
+  wide = True
+
+do_upscale=False
 if (argsHasFlag(args, '--upscale')):
-  upscale = True
+  do_upscale = True
   args.remove('--upscale')
 
 do_cooldown = True
@@ -48,69 +60,104 @@ if (argsHasFlag(args, '--no-cooldown')):
   args.remove('--no-cooldown')
   do_cooldown = False
 
-diffuser = ''
+diffuser_16_names = {
+  'protogen': 'darkstorm2150/Protogen_Infinity_Official_Release',
+  'dream2': 'dreamlike-art/dreamlike-photoreal-2.0',
+  'epic': 'johnslegers/epic-diffusion-v1.1',
+  'dream1': 'dreamlike-art/dreamlike-diffusion-1.0',
+  'er': 'nitrosocke/elden-ring-diffusion',
+}
+diffuser_names = {
+  'nitro': 'nitrosocke/Nitro-Diffusion'
+}
+diffuser_sd_names = {
+  'sd2': 'stabilityai/stable-diffusion-2-1'
+}
+
+def get_diffuser_name(diffuser_key: str):
+  if diffuser_key in diffuser_16_names:
+    return diffuser_16_names[diffuser_key]
+  if diffuser_key in diffuser_names:
+    return diffuser_names[diffuser_key]
+  if diffuser_key in diffuser_sd_names:
+    return diffuser_sd_names[diffuser_key]
+  return diffuser_16_names['protogen']
+
+def get_pipe(diffuser_key: str):
+  if diffuser_key in diffuser_16_names.keys():
+    print(f'using {diffuser_16_names[diffuser_key]}')
+    return DiffusionPipeline.from_pretrained(diffuser_16_names[diffuser_key], torch_dtype=torch.float16)
+  if diffuser_key in diffuser_names.keys():
+    print(f'using {diffuser_names[diffuser_key]}')
+    return DiffusionPipeline.from_pretrained(diffuser_names[diffuser_key])
+  if diffuser_key in diffuser_sd_names.keys():
+    print(f'using {diffuser_sd_names[diffuser_key]}')
+    return StableDiffusionPipeline.from_pretrained(diffuser_sd_names[diffuser_key], torch_dtype=torch.float16)
+  print(f'using {diffuser_16_names["protogen"]}')
+  return DiffusionPipeline.from_pretrained(diffuser_16_names['protogen'], torch_dtype=torch.float16)
+
+diffuser_keys = []
+do_diffuser_flight = False
+if (argsHasFlag(args, '--diffuser-flight')):
+  do_diffuser_flight = True
+  args.remove('--diffuser-flight')
+  diffuser_keys = []
+  for key in diffuser_16_names:
+    diffuser_keys.append(key)
+  for key in diffuser_names:
+    diffuser_keys.append(key)
+  for key in diffuser_sd_names:
+    diffuser_keys.append(key)
+
 if (argsHasFlag(args, '--diffuser')):
   diffuser_index = args.index('--diffuser')
-  diffuser = args.pop(diffuser_index+1)
+  diffuser_key = args.pop(diffuser_index+1).lower()
   args.pop(diffuser_index)
-  if diffuser.lower() == 'sd2':
-    print('using stabilityai/stable-diffusion-2-1')
-    pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
-  elif diffuser.lower() == 'er':
-    print('using nitrosocke/elden-ring-diffusion')
-    pipe = DiffusionPipeline.from_pretrained("nitrosocke/elden-ring-diffusion", torch_dtype=torch.float16)
-  elif diffuser.lower() == 'epic':
-    print('using johnslegers/epic-diffusion-v1.1')
-    pipe = DiffusionPipeline.from_pretrained("johnslegers/epic-diffusion-v1.1", torch_dtype=torch.float16)
-  elif diffuser.lower() == 'dream1':
-    print('using dreamlike-art/dreamlike-diffusion-1.0')
-    pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-diffusion-1.0", torch_dtype=torch.float16)
-  elif diffuser.lower() == 'dream2':
-    print('using dreamlike-art/dreamlike-photoreal-2.0')
-    pipe = DiffusionPipeline.from_pretrained("dreamlike-art/dreamlike-photoreal-2.0", torch_dtype=torch.float16)
-  elif diffuser.lower() == 'protogen':
-    print('using darkstorm2150/Protogen_Infinity_Official_Release')
-    pipe = DiffusionPipeline.from_pretrained("darkstorm2150/Protogen_Infinity_Official_Release", torch_dtype=torch.float16)
-  elif diffuser.lower() == 'nitro':
-    print('using nitrosocke/Nitro-Diffusion')
-    pipe = DiffusionPipeline.from_pretrained("nitrosocke/Nitro-Diffusion")
-else:
-  print('using darkstorm2150/Protogen_Infinity_Official_Release')
-  pipe = pipe = DiffusionPipeline.from_pretrained("darkstorm2150/Protogen_Infinity_Official_Release", torch_dtype=torch.float16)
-pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-pipe = pipe.to("cuda")
+  diffuser_keys = [diffuser_key]
 
-prompts = args[1:-1]
-max = args[-1]
-dir_index = 0
 
-for prompt in prompts:
-  path_index = f'/{dir_index}' if len(prompts) > 1 else ''
-  prompt_file = f"./output/{launch_date}/{launch_time}{path_index}/prompt.txt"
-  os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
-  with open(f'{prompt_file}', 'w') as f:
-      f.write(prompt)
-  for index in range(1, int(max)+1):
-    if do_cooldown:
-      nvidia_temp = get_temp()
-      print(f'GPU Temp: {nvidia_temp}ºC')
-      if (nvidia_temp > 75):
-        print('Pausing to cool down.')
-        while (nvidia_temp > 70):
-          time = datetime.now().strftime("%H:%M:%S")
-          sleep(5)
-          nvidia_temp = get_temp()
-          print(f'[{time}] Temp: {nvidia_temp}ºC')
-        print(f'Temp: {nvidia_temp}ºC')
-        print('Resuming.')
-    image = pipe(prompt, height=height, width=width).images[0]
-    file_name = f"./output/{launch_date}/{launch_time}-{diffuser}{path_index}/{index}"
-    os.makedirs(os.path.dirname(f'{file_name}.png'), exist_ok=True)
-    image.save(f"{file_name}.png")
-    if (upscale):
-      os.makedirs(os.path.dirname(f'{file_name}_4x.png'), exist_ok=True)
-      upscale_command = f"./upscale/realesrgan-ncnn-vulkan -i {file_name}.png -o {file_name}_upscale.png"
-      with (subprocess.Popen(upscale_command.split(), stdout=subprocess.PIPE)) as process:
-        output, error = process.communicate()
-      
-  dir_index = dir_index + 1
+prompts = args[1:]
+
+for diffuser_key in diffuser_keys:
+  torch.cuda.empty_cache()
+  gc.collect()
+  diffuser = get_diffuser_name(diffuser_key)
+  pipe = get_pipe(diffuser_key)
+  pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+  pipe = pipe.to('cuda')
+  dir_index = 1
+  for prompt in prompts:
+    path_index = f'/{dir_index}' if len(prompts) > 1 else ''
+    base_path = f'./output/{launch_date}/{launch_time}{path_index}'
+    prompt_file = f'{base_path}/prompt.txt'
+    os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
+    with open(f'{prompt_file}', 'w') as f:
+        f.write(prompt)
+    for index in range(1, count+1):
+      if do_cooldown:
+        nvidia_temp = get_temp()
+        print(f'GPU Temp: {nvidia_temp}ºC')
+        if (nvidia_temp > 75):
+          print('Pausing to cool down.')
+          while (nvidia_temp > 70):
+            time = datetime.now().strftime('%H:%M:%S')
+            sleep(5)
+            nvidia_temp = get_temp()
+            print(f'[{time}] Temp: {nvidia_temp}ºC')
+          print(f'Temp: {nvidia_temp}ºC')
+          print('Resuming.')
+      if (not width and not height and wide):
+        print('using wide aspect ratio')
+        height=504
+        width=896
+      # generate image
+      print(f'generating: {prompt}')
+      image = pipe(prompt, height=height, width=width).images[0]
+      file_name = f'{base_path}/{index}-{diffuser_key}.png'
+      os.makedirs(os.path.dirname(f'{file_name}'), exist_ok=True)
+      if (do_upscale):
+        print('upscaling image...')
+        image = upscale(image, models['4x'])
+      image.save(f'{file_name}')
+        
+    dir_index = dir_index + 1

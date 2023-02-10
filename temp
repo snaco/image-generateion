@@ -2,11 +2,16 @@
 
 import subprocess
 import re
+from time import sleep
+
+
 r = re.compile('GPUCurrentTemp')
 bash_command = "nvidia-smi -q -d temperature"
-process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
-output, error = process.communicate()
-lines = str(output).split('\\n')
-lines = list(map(lambda x: x.replace(' ', ''), lines))
-nvidia_temp = list(filter(r.match, lines))[0]
-print(nvidia_temp)
+while True:
+  process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
+  output, error = process.communicate()
+  lines = str(output).split('\\n')
+  lines = list(map(lambda x: x.replace(' ', ''), lines))
+  nvidia_temp = list(filter(r.match, lines))[0]
+  print(nvidia_temp)
+  sleep(1)

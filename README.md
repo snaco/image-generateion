@@ -2,13 +2,19 @@
 
 ## Prerequisites
 
+Install python 3.10.6 then run
 ```
-pip install diffusers transformers accelerate scipy safetensors torch xformers
+pip install pipenv
+pipenv install
+pipenv shell
 ```
+
+When starting a new session, make sure to run `pipenv shell` to actiate the pip environment. 
 
 ## Scripts
+  * `./temp` - displays the current gpu temperature
 
- * `./generate "prompt1" "prompt2" ... X [--no-cooldown] [--diffuser <diffuser_name>]`
+ * `./generate "prompt1" "prompt2" ... X [--no-cooldown] [[--diffuser <diffuser_name>] | [--diffuser-flight]] [[--wide] | [--width <number>] [--height <number>]] [--upscale] [--count <number>]`
 
     This can take any number of prompts, make sure each prompt is surrounded by "".  In place of X can be any number, this is how many images to generate per prompt. 
     
@@ -16,7 +22,7 @@ pip install diffusers transformers accelerate scipy safetensors torch xformers
 
     You can specify the resolution with `--height <number>` and `width <number>`. When not specified these default to `512`.
 
-    You can specify a diffuser with `--diffuser <diffuser_name>` where `diffuser_name` can be:
+    You can specify a diffuser with `--diffuser <diffuser_name>`. When not provided the diffuser defaults to protogen. Valid choices are:
     * `sd2` - stabilityai/stable-diffusion-2-1
     * `er` - nitrosocke/elden-ring-diffusion
     * `epic` - johnslegers/epic-diffusion-v1.1
@@ -24,7 +30,21 @@ pip install diffusers transformers accelerate scipy safetensors torch xformers
     * `dream2` - dreamlike-art/dreamlike-photoreal-2.0
     * `protogen` - darkstorm2150/Protogen_Infinity_Official_Release
     * `nitro` - nitrosocke/Nitro-Diffusion
-    When not provided the diffuser defaults to protogen.
     
+    You can provide `--diffuser-flight` This will override andy `--diffuser` argument and perform the requested generation with each diffuser.
 
-* `./temp` - displays the current gpu temperature
+    You can provide `--upscale` to run the output image through a 4x upscale before it is saved.
+
+    You can provide `--wide` to generate a 16:9 image (height=504 width=896), manual `--width` and/or `--height` arguments will ignore the `--wide` flag.
+
+    You can provide `--count <number>` to generate that many images for each prompt. In the case where `--diffuser-flight` is provided this will generate that many images per propmpt per diffuser.
+    
+    examples:
+    * Generate 3 16:9 upscaled images of a mouse holding a balloon with dream2 diffuser
+    ```
+      ./generate "a mouse holding a balloon, oil painting" --diffuser dream2 --wide --upscale 3
+    ```
+    * Generate an image of batman and an image of coffee with each diffuser
+    ```
+      ./generate "a steaming hot cup of coffee, digital art" "batman at the disco, cartoon" --diffuser-flight
+    ```

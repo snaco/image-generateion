@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+diffusers = "*"
+transformers = "*"
+accelerate = "*"
+scipy = "*"
+safetensors = "*"
+torch = "*"
+xformers = "*"
+numpy = "*"
+onnxruntime = "==1.12.0"
+opencv-python-headless = "*"
+triton = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
