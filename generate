@@ -73,10 +73,10 @@ if (args_has_flag('--width')):
   arg_index = arg_index_containing('--width')
   height = flag_value_at_index(arg_index)
 
-memory_efficient=False
-if (args_has_flag('--memory-efficient')):
-  arg_index = args.index('--memory-efficient')
-  memory_efficient = True
+fast=False
+if (args_has_flag('--fast')):
+  arg_index = args.index('--fast')
+  fast = True
   args.pop(arg_index)
 
 square_scale=1
@@ -149,7 +149,7 @@ for diffuser_key in diffuser_keys:
   print(f'using {diffuser}')
   pipe = get_pipe(diffuser_key)
   pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-  if memory_efficient:
+  if not fast:
     pipe.enable_attention_slicing()
     pipe.enable_xformers_memory_efficient_attention()
   pipe = pipe.to('cuda')
