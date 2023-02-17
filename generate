@@ -56,6 +56,14 @@ if argsHasFlag(args, '--count'):
   count = int(args.pop(arg_index+1))
   args.pop(arg_index)
 
+base_output_path='./output'
+if (argsHasFlag(args, '--output-dir')):
+  arg_index = args.index('--output-dir')
+  base_output_path=args.pop(arg_index+1)
+  if base_output_path.endswith('/'):
+    base_output_path = base_output_path[:-1]
+  args.pop(arg_index)
+
 wide=False
 wide_scale=1
 if (argsHasFlag(args, '--wide')):
@@ -136,13 +144,14 @@ for diffuser_key in diffuser_keys:
   print(f'using {diffuser}')
   pipe = get_pipe(diffuser_key)
   pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-  pipe.enable_attention_slicing()
-  pipe.enable_xformers_memory_efficient_attention()
+  if memory_efficient:
+    pipe.enable_attention_slicing()
+    pipe.enable_xformers_memory_efficient_attention()
   pipe = pipe.to('cuda')
   dir_index = 1
   for prompt in prompts:
     path_index = f'/{dir_index}' if len(prompts) > 1 else ''
-    base_path = f'./output/{launch_date}/{launch_time}{path_index}'
+    base_path = f'{base_output_path}/{launch_date}/{launch_time}{path_index}'
     prompt_file = f'{base_path}/prompt.txt'
     os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
     with open(f'{prompt_file}', 'w') as f:

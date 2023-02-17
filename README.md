@@ -45,6 +45,8 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
     
     You can provide `--memory-efficient` to drastically ower the VRAM usage but greatly increase the generation time.
 
+    You can provide `--output-dir <directory>` to specify where to save the output images. This can be a relative path like `./my/awesome/dir` or an absolute path like `/home/user/even/cooler/dir`
+
     examples:
     * Generate 3 1920x1080 images, upscaled by 2x of a mouse holding a balloon with the dream2 diffuser
     ```
