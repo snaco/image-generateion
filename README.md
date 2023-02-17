@@ -23,6 +23,7 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
     You can specify the resolution with `--height <number>` and `width <number>`. When not specified these default to `512`.
 
     You can specify a diffuser with `--diffuser <diffuser_name>`. When not provided the diffuser defaults to protogen. Valid choices are:
+
     * `sd2` - stabilityai/stable-diffusion-2-1
     * `er` - nitrosocke/elden-ring-diffusion
     * `epic` - johnslegers/epic-diffusion-v1.1
@@ -32,7 +33,8 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
     * `nitro` - nitrosocke/Nitro-Diffusion
     * `lowpoly` - MirageML/lowpoly-world
     * `sci-fi` - Joeythemonster/sci-fi-landscape
-    
+    * `waifu` - hakurei/waifu-diffusion
+
     You can provide `--diffuser-flight` This will override andy `--diffuser` argument and perform the requested generation with each diffuser.
 
     You can provide `--upscale <number>` to run the output image through a 2x upscale before it is saved. The number provided is the number of passes to make. I.E: 1 = 2x, 2 = 4x, 3 = 8x.

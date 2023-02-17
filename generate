@@ -102,7 +102,8 @@ diffuser_names = {
   'lowpoly': 'MirageML/lowpoly-world',
   "sci-fi": 'Joeythemonster/sci-fi-landscape',
   'nitro': 'nitrosocke/Nitro-Diffusion',
-  'sd2': 'stabilityai/stable-diffusion-2-1'
+  'sd2': 'stabilityai/stable-diffusion-2-1',
+  'waifu': 'hakurei/waifu-diffusion'
 }
 
 def get_diffuser_name(diffuser_key: str):
@@ -133,6 +134,9 @@ if (argsHasFlag(args, '--diffuser')):
 
 
 prompts = args[1:]
+
+if len(diffuser_keys) == 0:
+  diffuser_keys.append('protogen')
 
 for diffuser_key in diffuser_keys:
   torch.cuda.empty_cache()
