@@ -14,7 +14,7 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
 ## Scripts
   * `./temp` - displays the current gpu temperature
 
- * `./generate "prompt1" "prompt2" ... [--no-cooldown] [[--diffuser=<diffuser_name>] | [--diffuser-flight]] [[--wide=<number>] | [--tall=<number>] | [--width=<number>] [--height=<number>]] [--upscale=<number>] [--count=<number>] [--fast] [--seed=<number>]`
+ * `./generate "prompt1" "prompt2" ... [--no-cooldown] [[--diffuser=<diffuser_name>] | [--diffuser-flight]] [[--wide=<number>] | [--tall=<number>] | [--width=<number>] [--height=<number>]] [--upscale=<number>] [--count=<number>] [--fast] [--seed=<number>] [--safe]`
 
     This can take any number of prompts, make sure each prompt is surrounded by "".
     
@@ -52,6 +52,8 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
     You can provide `--output-dir=<directory>` to specify where to save the output images. This can be a relative path like `./my/awesome/dir` or an absolute path like `/home/user/even/cooler/dir`
 
     You can provide `--seed=<number>` to make each image generated use the same seed instead of randomizing (normal behavior).
+
+    You can provide `--safe` to enable NSFW content checking. If it detects nsfw content it will black out the image.
 
     You can provide `--negative-prompt="<prompts>"` to influence what you don't want in your image. This can be a comma separated list or just a single prompt. e.g: `--negative-prompt="duplication artifacts"` or `--negative-prompt="duplication artifacts, bad anatomy, bad face"` the effectiveness of this is questionable depending on the diffuser but it definitely doesn't hurt to try.
 

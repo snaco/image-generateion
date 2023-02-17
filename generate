@@ -32,6 +32,9 @@ diffuser_names = {
   'redshift': 'nitrosocke/redshift-diffusion-768'
 }
 
+def no_check(images, **kwargs):
+  return images, False
+
 def get_diffuser_name(diffuser_key: str):
   if diffuser_key in diffuser_names:
     return diffuser_names[diffuser_key]
@@ -146,6 +149,11 @@ if (args_has_flag('--diffuser')):
   diffuser_key = flag_value_at_index(arg_index).lower()
   diffuser_keys = [diffuser_key]
 
+disable_safety_check = True
+if args_has_flag('--safe'):
+  args.remove('--safe')
+  disable_safety_check = False
+
 if len(diffuser_keys) == 0:
   diffuser_keys.append('protogen')
 
@@ -162,6 +170,8 @@ for diffuser_key in diffuser_keys:
   if not fast:
     pipe.enable_attention_slicing()
     pipe.enable_xformers_memory_efficient_attention()
+  if disable_safety_check and diffuser_key not in ['dream2']:
+    pipe.safety_checker = no_check
   pipe = pipe.to('cuda')
   dir_index = 1
   for prompt in prompts:
