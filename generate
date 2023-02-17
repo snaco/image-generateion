@@ -145,7 +145,7 @@ if (args_has_flag('--diffuser-flight')):
     diffuser_keys.append(key)
 
 if (args_has_flag('--diffuser')):
-  diffuser_index = arg_index_containing('--diffuser')
+  arg_index = arg_index_containing('--diffuser')
   diffuser_key = flag_value_at_index(arg_index).lower()
   diffuser_keys = [diffuser_key]
 
@@ -206,9 +206,9 @@ for diffuser_key in diffuser_keys:
       print(f'generating: {prompt}')
       if manual_seed:
         generator = torch.Generator("cuda").manual_seed(manual_seed)
+        image = pipe(prompt, height=height, width=width, generator=generator, negative_prompt=negative_prompt).images[0]
       else:
-        generator = torch.Generator("cuda")
-      image = pipe(prompt, height=height, width=width, generator=generator, negative_prompt=negative_prompt).images[0]
+        image = pipe(prompt, height=height, width=width, negative_prompt=negative_prompt).images[0]
       file_name = f'{base_path}/{index}.png'
       os.makedirs(os.path.dirname(f'{file_name}'), exist_ok=True)
       if (do_upscale):
