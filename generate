@@ -44,6 +44,12 @@ if (argsHasFlag(args, '--width')):
   width = int(args.pop(arg_index+1))
   args.pop(arg_index)
 
+memory_efficient=False
+if (argsHasFlag(args, '--memory-efficient')):
+  arg_index = args.index('--memory-efficient')
+  memory_efficient = True
+  args.pop(arg_index)
+
 count=1
 if argsHasFlag(args, '--count'):
   arg_index = args.index('--count')
@@ -79,7 +85,7 @@ if (argsHasFlag(args, '--no-cooldown')):
   args.remove('--no-cooldown')
   do_cooldown = False
 
-diffuser_16_names = {
+diffuser_names = {
   'protogen': 'darkstorm2150/Protogen_Infinity_Official_Release',
   'dream2': 'dreamlike-art/dreamlike-photoreal-2.0',
   'epic': 'johnslegers/epic-diffusion-v1.1',
@@ -87,27 +93,19 @@ diffuser_16_names = {
   'er': 'nitrosocke/elden-ring-diffusion',
   'lowpoly': 'MirageML/lowpoly-world',
   "sci-fi": 'Joeythemonster/sci-fi-landscape',
-  'nitro': 'nitrosocke/Nitro-Diffusion'
-}
-diffuser_sd_names = {
+  'nitro': 'nitrosocke/Nitro-Diffusion',
   'sd2': 'stabilityai/stable-diffusion-2-1'
 }
 
 def get_diffuser_name(diffuser_key: str):
-  if diffuser_key in diffuser_16_names:
-    return diffuser_16_names[diffuser_key]
-  if diffuser_key in diffuser_sd_names:
-    return diffuser_sd_names[diffuser_key]
-  return diffuser_16_names['protogen']
+  if diffuser_key in diffuser_names:
+    return diffuser_names[diffuser_key]
+  return diffuser_names['protogen']
 
 def get_pipe(diffuser_key: str):
-  if diffuser_key in diffuser_16_names.keys():
-    return DiffusionPipeline.from_pretrained(diffuser_16_names[diffuser_key], torch_dtype=torch.float16)
   if diffuser_key in diffuser_names.keys():
-    return DiffusionPipeline.from_pretrained(diffuser_names[diffuser_key])
-  if diffuser_key in diffuser_sd_names.keys():
-    return StableDiffusionPipeline.from_pretrained(diffuser_sd_names[diffuser_key], torch_dtype=torch.float16)
-  return DiffusionPipeline.from_pretrained(diffuser_16_names['protogen'], torch_dtype=torch.float16)
+    return DiffusionPipeline.from_pretrained(diffuser_names[diffuser_key], torch_dtype=torch.float16)
+  return DiffusionPipeline.from_pretrained(diffuser_names['protogen'], torch_dtype=torch.float16)
 
 diffuser_keys = []
 do_diffuser_flight = False
@@ -115,7 +113,7 @@ if (argsHasFlag(args, '--diffuser-flight')):
   do_diffuser_flight = True
   args.remove('--diffuser-flight')
   diffuser_keys = []
-  for key in diffuser_16_names:
+  for key in diffuser_names:
     diffuser_keys.append(key)
   for key in diffuser_names:
     diffuser_keys.append(key)
@@ -138,7 +136,8 @@ for diffuser_key in diffuser_keys:
   print(f'using {diffuser}')
   pipe = get_pipe(diffuser_key)
   pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-  pipe.safety_checker = lambda images, clip_input: (images, False)
+  pipe.enable_attention_slicing()
+  pipe.enable_xformers_memory_efficient_attention()
   pipe = pipe.to('cuda')
   dir_index = 1
   for prompt in prompts:
@@ -162,12 +161,12 @@ for diffuser_key in diffuser_keys:
           print(f'Temp: {nvidia_temp}ºC')
           print('Resuming.')
       if (not width and not height and wide):
-        height=int(9*8*5*wide_scale)
-        width=int(16*8*5*wide_scale)
+        height=int(9*8*wide_scale)
+        width=int(16*8*wide_scale)
         print(f'using wide aspect ratio, {width}x{height}')
       if (not width and not height and tall):
-        height=int(16*8*5*tall_scale)
-        width=int(9*8*5*tall_scale)
+        height=int(16*8*tall_scale)
+        width=int(9*8*tall_scale)
         print(f'using tall aspect ratio, {width}x{height}')
       # generate image
       print(f'generating: {prompt}')
@@ -180,11 +179,6 @@ for diffuser_key in diffuser_keys:
         print('upscaling image...')
         for _pass in range(0, upscale_passes):
           image = upscale(image, models['2x'])
-          # image = image.filter(ImageFilter.SHARPEN)
-          # enhance
-          # for _ in range(0, 3):
-          #   image = image.resize((int(image.height/2), int(image.width/2)))
-          #   image = upscale(image, models['2x'])
         print(f'saving image {image.width}x{image.height}')
       image.save(f'{file_name}')
         
