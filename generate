@@ -123,10 +123,7 @@ if (argsHasFlag(args, '--diffuser-flight')):
   diffuser_keys = []
   for key in diffuser_names:
     diffuser_keys.append(key)
-  for key in diffuser_names:
-    diffuser_keys.append(key)
-  for key in diffuser_sd_names:
-    diffuser_keys.append(key)
+
 
 if (argsHasFlag(args, '--diffuser')):
   diffuser_index = args.index('--diffuser')
