@@ -148,7 +148,8 @@ for diffuser_key in diffuser_keys:
   dir_index = 1
   for prompt in prompts:
     path_index = f'/{dir_index}' if len(prompts) > 1 else ''
-    base_path = f'{base_output_path}/{launch_date}/{launch_time}{path_index}'
+    diffuser_path = f'/{diffuser_key}' if do_diffuser_flight else ''
+    base_path = f'{base_output_path}/{launch_date}/{launch_time}{diffuser_path}{path_index}'
     prompt_file = f'{base_path}/prompt.txt'
     os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
     with open(f'{prompt_file}', 'w') as f:
@@ -179,7 +180,7 @@ for diffuser_key in diffuser_keys:
       # generator = [torch.Generator(device="cuda").manual_seed(0) for i in range(4)]
       # generator = torch.Generator(device="cuda").manual_seed(index)
       image = pipe(prompt, height=height, width=width).images[0] # num_inference_steps=1
-      file_name = f'{base_path}/{index}-{diffuser_key}.png'
+      file_name = f'{base_path}/{index}.png'
       os.makedirs(os.path.dirname(f'{file_name}'), exist_ok=True)
       if (do_upscale):
         print('upscaling image...')
