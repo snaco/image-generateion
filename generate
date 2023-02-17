@@ -170,7 +170,7 @@ for diffuser_key in diffuser_keys:
   if not fast:
     pipe.enable_attention_slicing()
     pipe.enable_xformers_memory_efficient_attention()
-  if disable_safety_check and diffuser_key not in ['dream2']:
+  if disable_safety_check and diffuser_key not in ['dream2', 'dream1']:
     pipe.safety_checker = no_check
   pipe = pipe.to('cuda')
   dir_index = 1
