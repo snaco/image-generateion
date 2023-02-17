@@ -43,6 +43,8 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
 
     You can provide `--tall <number>` to generate a 9:16 image. It works the same way as `--wide`
 
+    You can provide `--square <number>` to generate a scaled 1:1 image. `--square 1` will produce a 512x512 image. The number provided is the multiplier to the side length of the square.
+
     You can provide `--count <number>` to generate that many images for each prompt. In the case where `--diffuser-flight` is provided this will generate that many images per propmpt per diffuser.
     
     You can provide `--memory-efficient` to drastically ower the VRAM usage but greatly increase the generation time.
