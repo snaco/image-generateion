@@ -11,11 +11,16 @@ import torch
 from upscale import upscale, models
 import gc
 
+from PIL import ImageFilter
+from PIL import Image
+
 launch_time = datetime.now().strftime('%H:%M:%S')
 launch_date = datetime.now().strftime('%Y-%m-%d')
 nvidia_temp_command = 'nvidia-smi -q -d temperature'
 gpu_temp_regex = re.compile('GPUCurrentTemp')
 args = sys.argv
+torch.cuda.empty_cache()
+gc.collect()
 
 def argsHasFlag(args, flag):
   return len(list(filter(lambda x: flag in x, args))) > 0
@@ -46,14 +51,28 @@ if argsHasFlag(args, '--count'):
   args.pop(arg_index)
 
 wide=False
+wide_scale=1
 if (argsHasFlag(args, '--wide')):
-  args.remove('--wide')
+  arg_index = args.index('--wide')
+  wide_scale = int(args.pop(arg_index+1))
+  args.pop(arg_index)
   wide = True
 
+tall=False
+tall_scale=1
+if (argsHasFlag(args, '--tall')):
+  arg_index = args.index('--tall')
+  tall_scale = int(args.pop(arg_index+1))
+  args.pop(arg_index)
+  tall = True
+
 do_upscale=False
+upscale_passes = 1
 if (argsHasFlag(args, '--upscale')):
-  do_upscale = True
-  args.remove('--upscale')
+  arg_index = args.index('--upscale')
+  upscale_passes = int(args.pop(arg_index+1))
+  args.pop(arg_index)
+  do_upscale=True
 
 do_cooldown = True
 if (argsHasFlag(args, '--no-cooldown')):
@@ -66,8 +85,8 @@ diffuser_16_names = {
   'epic': 'johnslegers/epic-diffusion-v1.1',
   'dream1': 'dreamlike-art/dreamlike-diffusion-1.0',
   'er': 'nitrosocke/elden-ring-diffusion',
-}
-diffuser_names = {
+  'lowpoly': 'MirageML/lowpoly-world',
+  "sci-fi": 'Joeythemonster/sci-fi-landscape',
   'nitro': 'nitrosocke/Nitro-Diffusion'
 }
 diffuser_sd_names = {
@@ -77,23 +96,17 @@ diffuser_sd_names = {
 def get_diffuser_name(diffuser_key: str):
   if diffuser_key in diffuser_16_names:
     return diffuser_16_names[diffuser_key]
-  if diffuser_key in diffuser_names:
-    return diffuser_names[diffuser_key]
   if diffuser_key in diffuser_sd_names:
     return diffuser_sd_names[diffuser_key]
   return diffuser_16_names['protogen']
 
 def get_pipe(diffuser_key: str):
   if diffuser_key in diffuser_16_names.keys():
-    print(f'using {diffuser_16_names[diffuser_key]}')
     return DiffusionPipeline.from_pretrained(diffuser_16_names[diffuser_key], torch_dtype=torch.float16)
   if diffuser_key in diffuser_names.keys():
-    print(f'using {diffuser_names[diffuser_key]}')
     return DiffusionPipeline.from_pretrained(diffuser_names[diffuser_key])
   if diffuser_key in diffuser_sd_names.keys():
-    print(f'using {diffuser_sd_names[diffuser_key]}')
     return StableDiffusionPipeline.from_pretrained(diffuser_sd_names[diffuser_key], torch_dtype=torch.float16)
-  print(f'using {diffuser_16_names["protogen"]}')
   return DiffusionPipeline.from_pretrained(diffuser_16_names['protogen'], torch_dtype=torch.float16)
 
 diffuser_keys = []
@@ -122,8 +135,10 @@ for diffuser_key in diffuser_keys:
   torch.cuda.empty_cache()
   gc.collect()
   diffuser = get_diffuser_name(diffuser_key)
+  print(f'using {diffuser}')
   pipe = get_pipe(diffuser_key)
   pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+  pipe.safety_checker = lambda images, clip_input: (images, False)
   pipe = pipe.to('cuda')
   dir_index = 1
   for prompt in prompts:
@@ -147,17 +162,30 @@ for diffuser_key in diffuser_keys:
           print(f'Temp: {nvidia_temp}ºC')
           print('Resuming.')
       if (not width and not height and wide):
-        print('using wide aspect ratio')
-        height=504
-        width=896
+        height=int(9*8*5*wide_scale)
+        width=int(16*8*5*wide_scale)
+        print(f'using wide aspect ratio, {width}x{height}')
+      if (not width and not height and tall):
+        height=int(16*8*5*tall_scale)
+        width=int(9*8*5*tall_scale)
+        print(f'using tall aspect ratio, {width}x{height}')
       # generate image
       print(f'generating: {prompt}')
-      image = pipe(prompt, height=height, width=width).images[0]
+      # generator = [torch.Generator(device="cuda").manual_seed(0) for i in range(4)]
+      # generator = torch.Generator(device="cuda").manual_seed(index)
+      image = pipe(prompt, height=height, width=width).images[0] # num_inference_steps=1
       file_name = f'{base_path}/{index}-{diffuser_key}.png'
       os.makedirs(os.path.dirname(f'{file_name}'), exist_ok=True)
       if (do_upscale):
         print('upscaling image...')
-        image = upscale(image, models['4x'])
+        for _pass in range(0, upscale_passes):
+          image = upscale(image, models['2x'])
+          # image = image.filter(ImageFilter.SHARPEN)
+          # enhance
+          # for _ in range(0, 3):
+          #   image = image.resize((int(image.height/2), int(image.width/2)))
+          #   image = upscale(image, models['2x'])
+        print(f'saving image {image.width}x{image.height}')
       image.save(f'{file_name}')
         
     dir_index = dir_index + 1

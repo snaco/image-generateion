@@ -14,7 +14,7 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
 ## Scripts
   * `./temp` - displays the current gpu temperature
 
- * `./generate "prompt1" "prompt2" ... X [--no-cooldown] [[--diffuser <diffuser_name>] | [--diffuser-flight]] [[--wide] | [--width <number>] [--height <number>]] [--upscale] [--count <number>]`
+ * `./generate "prompt1" "prompt2" ... X [--no-cooldown] [[--diffuser <diffuser_name>] | [--diffuser-flight]] [[--wide <number>] | [--tall <number>] | [--width <number>] [--height <number>]] [--upscale <number>] [--count <number>]`
 
     This can take any number of prompts, make sure each prompt is surrounded by "".  In place of X can be any number, this is how many images to generate per prompt. 
     
@@ -33,7 +33,7 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
     
     You can provide `--diffuser-flight` This will override andy `--diffuser` argument and perform the requested generation with each diffuser.
 
-    You can provide `--upscale` to run the output image through a 4x upscale before it is saved.
+    You can provide `--upscale <number>` to run the output image through a 4x upscale before it is saved. The number provided is the number of passes to make. I.E: 1 = 2x, 2 = 4x, 3 = 8x. This will run out of memory fast, so sticking to 3 or lower is recommended.
 
     You can provide `--wide` to generate a 16:9 image (height=504 width=896), manual `--width` and/or `--height` arguments will ignore the `--wide` flag.
 
@@ -42,7 +42,7 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
     examples:
     * Generate 3 16:9 upscaled images of a mouse holding a balloon with dream2 diffuser
     ```
-      ./generate "a mouse holding a balloon, oil painting" --diffuser dream2 --wide --upscale 3
+      ./generate "a mouse holding a balloon, oil painting" --diffuser dream2 --wide --upscale 1 --count 3
     ```
     * Generate an image of batman and an image of coffee with each diffuser
     ```

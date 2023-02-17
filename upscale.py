@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import onnxruntime
 import PIL
+from PIL import Image
 
 
 
@@ -43,7 +44,7 @@ def convert_pil_to_cv2(image):
     return open_cv_image
 
 
-def upscale(image, model):
+def upscale(image, model) -> Image:
     model_path = f"models/{model}.ort"
     img = convert_pil_to_cv2(image)
     if img.ndim == 2:
