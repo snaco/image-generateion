@@ -14,7 +14,7 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
 ## Scripts
   * `./temp` - displays the current gpu temperature
 
- * `./generate "prompt1" "prompt2" ... [--no-cooldown] [[--diffuser=<diffuser_name>] | [--diffuser-flight]] [[--wide=<number>] | [--tall=<number>] | [--width=<number>] [--height=<number>]] [--upscale=<number>] [--count=<number>] [--fast]`
+ * `./generate "prompt1" "prompt2" ... [--no-cooldown] [[--diffuser=<diffuser_name>] | [--diffuser-flight]] [[--wide=<number>] | [--tall=<number>] | [--width=<number>] [--height=<number>]] [--upscale=<number>] [--count=<number>] [--fast] [--seed=<number>]`
 
     This can take any number of prompts, make sure each prompt is surrounded by "".
     
@@ -50,6 +50,8 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
     You can provide `--fast` to generate images faster but at the cost of using much more VRAM. Unless you have a monster GPU it's best to leave this off.
 
     You can provide `--output-dir=<directory>` to specify where to save the output images. This can be a relative path like `./my/awesome/dir` or an absolute path like `/home/user/even/cooler/dir`
+
+    You can provide `--seed=<number>` to make each image generated use the same seed instead of randomizing (normal behavior).
 
     examples:
     * Generate 3 1920x1080 images, upscaled by 2x of a mouse holding a balloon with the dream2 diffuser
