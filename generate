@@ -11,7 +11,6 @@ import torch
 from upscale import upscale, models
 import gc
 
-os.environ['HF_HOME'] = '/usr/.cache/'
 launch_time = datetime.now().strftime('%H:%M:%S')
 launch_date = datetime.now().strftime('%Y-%m-%d')
 nvidia_temp_command = 'nvidia-smi -q -d temperature'
@@ -19,84 +18,6 @@ gpu_temp_regex = re.compile('GPUCurrentTemp')
 args = sys.argv
 torch.cuda.empty_cache()
 gc.collect()
-
-def argsHasFlag(args, flag):
-  return len(list(filter(lambda x: flag in x, args))) > 0
-
-def get_temp() -> int:
-  with (subprocess.Popen(nvidia_temp_command.split(), stdout=subprocess.PIPE)) as process:
-    output, error = process.communicate()
-    lines = str(output).split('\\n')
-    lines = list(map(lambda x: x.replace(' ', ''), lines))
-    return int(list(filter(gpu_temp_regex.match, lines))[0].split(':')[1][:-1])
-
-height=None
-if (argsHasFlag(args, '--height')):
-  arg_index = args.index('--height')
-  height = int(args.pop(arg_index+1))
-  args.pop(arg_index)
-
-width=None
-if (argsHasFlag(args, '--width')):
-  arg_index = args.index('--width')
-  width = int(args.pop(arg_index+1))
-  args.pop(arg_index)
-
-memory_efficient=False
-if (argsHasFlag(args, '--memory-efficient')):
-  arg_index = args.index('--memory-efficient')
-  memory_efficient = True
-  args.pop(arg_index)
-
-square_scale=1
-if (argsHasFlag(args, '--square')):
-  arg_index = args.index('--square')
-  square_scale = int(args.pop(arg_index+1))
-  args.pop(arg_index)
-
-count=1
-if argsHasFlag(args, '--count'):
-  arg_index = args.index('--count')
-  count = int(args.pop(arg_index+1))
-  args.pop(arg_index)
-
-base_output_path='./output'
-if (argsHasFlag(args, '--output-dir')):
-  arg_index = args.index('--output-dir')
-  base_output_path=args.pop(arg_index+1)
-  if base_output_path.endswith('/'):
-    base_output_path = base_output_path[:-1]
-  args.pop(arg_index)
-
-wide=False
-wide_scale=1
-if (argsHasFlag(args, '--wide')):
-  arg_index = args.index('--wide')
-  wide_scale = int(args.pop(arg_index+1))
-  args.pop(arg_index)
-  wide = True
-
-tall=False
-tall_scale=1
-if (argsHasFlag(args, '--tall')):
-  arg_index = args.index('--tall')
-  tall_scale = int(args.pop(arg_index+1))
-  args.pop(arg_index)
-  tall = True
-
-do_upscale=False
-upscale_passes = 1
-if (argsHasFlag(args, '--upscale')):
-  arg_index = args.index('--upscale')
-  upscale_passes = int(args.pop(arg_index+1))
-  args.pop(arg_index)
-  do_upscale=True
-
-do_cooldown = True
-if (argsHasFlag(args, '--no-cooldown')):
-  args.remove('--no-cooldown')
-  do_cooldown = False
-
 diffuser_names = {
   'protogen': 'darkstorm2150/Protogen_Infinity_Official_Release',
   'dream2': 'dreamlike-art/dreamlike-photoreal-2.0',
@@ -121,28 +42,106 @@ def get_pipe(diffuser_key: str):
     return DiffusionPipeline.from_pretrained(diffuser_names[diffuser_key], torch_dtype=torch.float16)
   return DiffusionPipeline.from_pretrained(diffuser_names['protogen'], torch_dtype=torch.float16)
 
+def arg_index_containing(flag):
+  for item in args:
+    if flag in item:
+      return args.index(item)
+  return -1
+
+def args_has_flag(flag):
+  return len(list(filter(lambda x: flag in x, args))) > 0
+
+def flag_value_at_index(index: int):
+  return args.pop(index).split('=')[1]
+
+def get_temp() -> int:
+  with (subprocess.Popen(nvidia_temp_command.split(), stdout=subprocess.PIPE)) as process:
+    output, error = process.communicate()
+    lines = str(output).split('\\n')
+    lines = list(map(lambda x: x.replace(' ', ''), lines))
+    return int(list(filter(gpu_temp_regex.match, lines))[0].split(':')[1][:-1])
+
+# Arg parsing
+
+height=None
+if (args_has_flag('--height')):
+  arg_index = arg_index_containing('--height')
+  height = flag_value_at_index(arg_index)
+
+width=None
+if (args_has_flag('--width')):
+  arg_index = arg_index_containing('--width')
+  height = flag_value_at_index(arg_index)
+
+memory_efficient=False
+if (args_has_flag('--memory-efficient')):
+  arg_index = args.index('--memory-efficient')
+  memory_efficient = True
+  args.pop(arg_index)
+
+square_scale=1
+if (args_has_flag('--square')):
+  arg_index = arg_index_containing('--square')
+  square_scale = int(flag_value_at_index(arg_index))
+
+count=1
+if args_has_flag('--count'):
+  arg_index = arg_index_containing('--count')
+  count = int(flag_value_at_index(arg_index))
+
+base_output_path='./output'
+if (args_has_flag('--output-dir')):
+  arg_index = arg_index_containing('--output-dir')
+  base_output_path=flag_value_at_index(arg_index).replace('"', '')
+  if base_output_path.endswith('/'):
+    base_output_path = base_output_path[:-1]
+
+wide=False
+wide_scale=1
+if (args_has_flag('--wide')):
+  arg_index = arg_index_containing('--wide')
+  wide_scale = int(flag_value_at_index(arg_index))
+  wide = True
+
+tall=False
+tall_scale=1
+if (args_has_flag('--tall')):
+  arg_index = arg_index_containing('--tall')
+  tall_scale = int(flag_value_at_index(arg_index))
+  tall = True
+
+do_upscale=False
+upscale_passes = 1
+if (args_has_flag('--upscale')):
+  arg_index = arg_index_containing('--upscale')
+  upscale_passes = int(flag_value_at_index(arg_index))
+  do_upscale=True
+
+do_cooldown = True
+if (args_has_flag('--no-cooldown')):
+  args.remove('--no-cooldown')
+  do_cooldown = False
+
 diffuser_keys = []
 do_diffuser_flight = False
-if (argsHasFlag(args, '--diffuser-flight')):
+if (args_has_flag('--diffuser-flight')):
   do_diffuser_flight = True
   args.remove('--diffuser-flight')
   diffuser_keys = []
   for key in diffuser_names:
     diffuser_keys.append(key)
 
-
-if (argsHasFlag(args, '--diffuser')):
-  diffuser_index = args.index('--diffuser')
-  diffuser_key = args.pop(diffuser_index+1).lower()
-  args.pop(diffuser_index)
+if (args_has_flag('--diffuser')):
+  diffuser_index = arg_index_containing('--diffuser')
+  diffuser_key = flag_value_at_index(arg_index).lower()
   diffuser_keys = [diffuser_key]
-
-
-prompts = args[1:]
 
 if len(diffuser_keys) == 0:
   diffuser_keys.append('protogen')
 
+prompts = args[1:]
+
+# generation
 for diffuser_key in diffuser_keys:
   torch.cuda.empty_cache()
   gc.collect()
