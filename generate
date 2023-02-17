@@ -94,6 +94,11 @@ if args_has_flag('--seed'):
   arg_index = arg_index_containing('--seed')
   manual_seed = int(flag_value_at_index(arg_index))
 
+negative_prompt=None
+if args_has_flag('--negative_prompt'):
+  arg_index = arg_index_containing('--negative_prompt')
+  negative_prompts = flag_value_at_index(arg_index).replace(', ', ',').split(',')
+
 base_output_path='./output'
 if (args_has_flag('--output-dir')):
   arg_index = arg_index_containing('--output-dir')
@@ -193,7 +198,7 @@ for diffuser_key in diffuser_keys:
         generator = torch.Generator("cuda").manual_seed(manual_seed)
       else:
         generator = torch.Generator("cuda")
-      image = pipe(prompt, height=height, width=width, generator=generator).images[0]
+      image = pipe(prompt, height=height, width=width, generator=generator, negative_prompt=negative_prompt).images[0]
       file_name = f'{base_path}/{index}.png'
       os.makedirs(os.path.dirname(f'{file_name}'), exist_ok=True)
       if (do_upscale):

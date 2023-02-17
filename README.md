@@ -53,6 +53,8 @@ When starting a new session, make sure to run `pipenv shell` to actiate the pip 
 
     You can provide `--seed=<number>` to make each image generated use the same seed instead of randomizing (normal behavior).
 
+    You can provide `--negative-prompt="<prompts>"` to influence what you don't want in your image. This can be a comma separated list or just a single prompt. e.g: `--negative-prompt="duplication artifacts"` or `--negative-prompt="duplication artifacts, bad anatomy, bad face"` the effectiveness of this is questionable depending on the diffuser but it definitely doesn't hurt to try.
+
     examples:
     * Generate 3 1920x1080 images, upscaled by 2x of a mouse holding a balloon with the dream2 diffuser
     ```
