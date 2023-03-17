@@ -8,7 +8,6 @@ import PIL
 from PIL import Image
 
 
-
 def pre_process(img: np.array) -> np.array:
     # H, W, C -> C, H, W
     img = np.transpose(img[:, :, 0:3], (2, 0, 1))

@@ -6,16 +6,16 @@ from time import sleep
 import os
 import re
 import subprocess
-import sys
 import torch
 from upscale import upscale, models
 import gc
+import yaml
+from typing import List
 
 launch_time = datetime.now().strftime('%H:%M:%S')
 launch_date = datetime.now().strftime('%Y-%m-%d')
 nvidia_temp_command = 'nvidia-smi -q -d temperature'
 gpu_temp_regex = re.compile('GPUCurrentTemp')
-args = sys.argv
 torch.cuda.empty_cache()
 gc.collect()
 diffuser_names = {
@@ -45,18 +45,6 @@ def get_pipe(diffuser_key: str):
     return DiffusionPipeline.from_pretrained(diffuser_names[diffuser_key], torch_dtype=torch.float16)
   return DiffusionPipeline.from_pretrained(diffuser_names['protogen'], torch_dtype=torch.float16)
 
-def arg_index_containing(flag):
-  for item in args:
-    if flag in item:
-      return args.index(item)
-  return -1
-
-def args_has_flag(flag):
-  return len(list(filter(lambda x: flag in x, args))) > 0
-
-def flag_value_at_index(index: int):
-  return args.pop(index).split('=')[1]
-
 def get_temp() -> int:
   with (subprocess.Popen(nvidia_temp_command.split(), stdout=subprocess.PIPE)) as process:
     output, error = process.communicate()
@@ -64,166 +52,108 @@ def get_temp() -> int:
     lines = list(map(lambda x: x.replace(' ', ''), lines))
     return int(list(filter(gpu_temp_regex.match, lines))[0].split(':')[1][:-1])
 
-# Arg parsing
-
-height=None
-if (args_has_flag('--height')):
-  arg_index = arg_index_containing('--height')
-  height = flag_value_at_index(arg_index)
-
-width=None
-if (args_has_flag('--width')):
-  arg_index = arg_index_containing('--width')
-  height = flag_value_at_index(arg_index)
-
-fast=False
-if (args_has_flag('--fast')):
-  arg_index = args.index('--fast')
-  fast = True
-  args.pop(arg_index)
-
-square_scale=1
-if (args_has_flag('--square')):
-  arg_index = arg_index_containing('--square')
-  square_scale = int(flag_value_at_index(arg_index))
-
-count=1
-if args_has_flag('--count'):
-  arg_index = arg_index_containing('--count')
-  count = int(flag_value_at_index(arg_index))
-
-manual_seed=None
-if args_has_flag('--seed'):
-  arg_index = arg_index_containing('--seed')
-  manual_seed = int(flag_value_at_index(arg_index))
-
-negative_prompt=None
-if args_has_flag('--negative_prompt'):
-  arg_index = arg_index_containing('--negative_prompt')
-  negative_prompts = flag_value_at_index(arg_index).replace(', ', ',').split(',')
-
-base_output_path='./output'
-if (args_has_flag('--output-dir')):
-  arg_index = arg_index_containing('--output-dir')
-  base_output_path=flag_value_at_index(arg_index).replace('"', '')
+#process config
+with open('config.yaml', 'r') as config_file:
+  config = yaml.safe_load(config_file)
+  do_wide: bool = config['wide']['enabled']
+  wide_scale: int = config['wide']['scale']
+  do_tall: bool = config['tall']['enabled']
+  tall_scale: int = config['tall']['scale']
+  do_square: bool = config['square']['enabled']
+  square_scale: int = config['square']['scale']
+  do_manual_res: bool = config['manual_resolution']['enabled']
+  manual_height: int = config['manual_resolution']['height']
+  manual_width: int = config['manual_resolution']['width']
+  do_upscale: bool = config['upscale']['enabled']
+  upscale_passes: int = config['upscale']['passes']
+  diffuser_keys: List[str] = config['diffusers']
+  prompts: List[str] = config['prompts']
+  negative_prompts: List[str] = config['negative_prompts']
+  count: int = config['count']
+  fast: bool = config['fast']
+  do_manual_seed: bool = config['manual_seed']['enabled']
+  manual_seed: int = config['manual_seed']['seed']
+  disable_safety_check: bool = not config['safety_check']['enabled']
+  safety_exempt_diffusers: List[str] = config['safety_check']['exempt_diffusers']
+  base_output_path: str = config['output_path']
   if base_output_path.endswith('/'):
     base_output_path = base_output_path[:-1]
+  do_cooldown: bool = config['cooldown']['enabled']
+  cooldown_threshhold: int = config['cooldown']['threshhold']
+  resume_temp: int = config['cooldown']['resume_temp']
 
-wide=False
-wide_scale=1
-if (args_has_flag('--wide')):
-  arg_index = arg_index_containing('--wide')
-  wide_scale = int(flag_value_at_index(arg_index))
-  wide = True
+  # generation
+  for diffuser_key in diffuser_keys:
+    torch.cuda.empty_cache()
+    gc.collect()
+    diffuser = get_diffuser_name(diffuser_key)
+    print(f'using {diffuser}')
+    pipe = get_pipe(diffuser_key)
+    pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+    if not fast:
+      pipe.enable_attention_slicing()
+      pipe.enable_xformers_memory_efficient_attention()
+    if disable_safety_check and diffuser_key not in safety_exempt_diffusers:
+      pipe.safety_checker = no_check
+    pipe = pipe.to('cuda')
+    dir_index = 1
+    for prompt in prompts:
+      path_index = f'/{dir_index}' if len(prompts) > 1 else ''
+      diffuser_path = f'/{diffuser_key}' if len(diffuser_keys) > 1 else ''
+      base_path = f'{base_output_path}/{launch_date}/{launch_time}{diffuser_path}{path_index}'
+      for index in range(1, count+1):
+        if do_cooldown:
+          nvidia_temp = get_temp()
+          print(f'GPU Temp: {nvidia_temp}ºC')
+          if (nvidia_temp > cooldown_threshhold):
+            print('Pausing to cool down.')
+            while (nvidia_temp > resume_temp):
+              time = datetime.now().strftime('%H:%M:%S')
+              sleep(5)
+              nvidia_temp = get_temp()
+              print(f'[{time}] Temp: {nvidia_temp}ºC')
+            print(f'Temp: {nvidia_temp}ºC')
+            print('Resuming.')
+        if (do_wide):
+          height=int(9*8*wide_scale)
+          width=int(16*8*wide_scale)
+          print(f'using wide aspect ratio, {width}x{height}')
+        elif (do_tall):
+          height=int(16*8*tall_scale)
+          width=int(9*8*tall_scale)
+          print(f'using tall aspect ratio, {width}x{height}')
+        elif (do_square):
+          height=8*square_scale
+          width=8*square_scale
+        elif do_manual_res:
+          height=manual_height
+          width=manual_width
+        else:
+          height=512
+          width=512
+        # generate image
+        print(f'generating: {prompt}')
+        if do_manual_seed:
+          image = pipe(prompt, height=height, width=width, generator=torch.Generator("cuda").manual_seed(manual_seed), negative_prompt=negative_prompt).images[0]
+        else:
+          try:
+            image = pipe(prompt, height=height, width=width, negative_prompt=negative_prompts[index]).images[0]
+          except IndexError:
+            image = pipe(prompt, height=height, width=width, negative_prompt=negative_prompts[0]).images[0]
+        file_name = f'{base_path}/{index}.png'
+        os.makedirs(os.path.dirname(f'{file_name}'), exist_ok=True)
+        if (do_upscale):
+          print('upscaling image...')
+          for _pass in range(0, upscale_passes):
+            image = upscale(image, models['2x'])
+          print(f'saving image {image.width}x{image.height}')
+        image.save(f'{file_name}')
 
-tall=False
-tall_scale=1
-if (args_has_flag('--tall')):
-  arg_index = arg_index_containing('--tall')
-  tall_scale = int(flag_value_at_index(arg_index))
-  tall = True
-
-do_upscale=False
-upscale_passes = 1
-if (args_has_flag('--upscale')):
-  arg_index = arg_index_containing('--upscale')
-  upscale_passes = int(flag_value_at_index(arg_index))
-  do_upscale=True
-
-do_cooldown = True
-if (args_has_flag('--no-cooldown')):
-  args.remove('--no-cooldown')
-  do_cooldown = False
-
-diffuser_keys = []
-do_diffuser_flight = False
-if (args_has_flag('--diffuser-flight')):
-  do_diffuser_flight = True
-  args.remove('--diffuser-flight')
-  diffuser_keys = []
-  for key in diffuser_names:
-    diffuser_keys.append(key)
-
-if (args_has_flag('--diffuser')):
-  diffuser_index = arg_index_containing('--diffuser')
-  diffuser_key = flag_value_at_index(arg_index).lower()
-  diffuser_keys = [diffuser_key]
-
-disable_safety_check = True
-if args_has_flag('--safe'):
-  args.remove('--safe')
-  disable_safety_check = False
-
-if len(diffuser_keys) == 0:
-  diffuser_keys.append('protogen')
-
-prompts = args[1:]
-
-# generation
-for diffuser_key in diffuser_keys:
-  torch.cuda.empty_cache()
-  gc.collect()
-  diffuser = get_diffuser_name(diffuser_key)
-  print(f'using {diffuser}')
-  pipe = get_pipe(diffuser_key)
-  pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-  if not fast:
-    pipe.enable_attention_slicing()
-    pipe.enable_xformers_memory_efficient_attention()
-  if disable_safety_check and diffuser_key not in ['dream2']:
-    pipe.safety_checker = no_check
-  pipe = pipe.to('cuda')
-  dir_index = 1
-  for prompt in prompts:
-    path_index = f'/{dir_index}' if len(prompts) > 1 else ''
-    diffuser_path = f'/{diffuser_key}' if do_diffuser_flight else ''
-    base_path = f'{base_output_path}/{launch_date}/{launch_time}{diffuser_path}{path_index}'
-    for index in range(1, count+1):
-      if do_cooldown:
-        nvidia_temp = get_temp()
-        print(f'GPU Temp: {nvidia_temp}ºC')
-        if (nvidia_temp > 75):
-          print('Pausing to cool down.')
-          while (nvidia_temp > 70):
-            time = datetime.now().strftime('%H:%M:%S')
-            sleep(5)
-            nvidia_temp = get_temp()
-            print(f'[{time}] Temp: {nvidia_temp}ºC')
-          print(f'Temp: {nvidia_temp}ºC')
-          print('Resuming.')
-      if (not width and not height and wide):
-        height=int(9*8*wide_scale)
-        width=int(16*8*wide_scale)
-        print(f'using wide aspect ratio, {width}x{height}')
-      if (not width and not height and tall):
-        height=int(16*8*tall_scale)
-        width=int(9*8*tall_scale)
-        print(f'using tall aspect ratio, {width}x{height}')
-      if (not width and not height and not tall and not wide):
-        height=512*square_scale
-        width=512*square_scale
-      # generate image
-      print(f'generating: {prompt}')
-      if manual_seed:
-        generator = torch.Generator("cuda").manual_seed(manual_seed)
-      else:
-        generator = torch.Generator("cuda")
-      image = pipe(prompt, height=height, width=width, generator=generator, negative_prompt=negative_prompt).images[0]
-      file_name = f'{base_path}/{index}.png'
-      os.makedirs(os.path.dirname(f'{file_name}'), exist_ok=True)
-      if (do_upscale):
-        print('upscaling image...')
-        for _pass in range(0, upscale_passes):
-          image = upscale(image, models['2x'])
-        print(f'saving image {image.width}x{image.height}')
-      image.save(f'{file_name}')
-
-    prompt_file = f'{base_path}/prompt.txt'
-    os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
-    with open(f'{prompt_file}', 'w') as f:
-      if do_diffuser_flight:  
-        f.write(prompt)
-      else:
-        f.write(f'{diffuser_key}: {prompt}')
-
-    dir_index = dir_index + 1
+      prompt_file = f'{base_path}/prompt.txt'
+      os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
+      with open(f'{prompt_file}', 'w') as f:
+        if len(diffuser_keys) > 1:  
+          f.write(f'prompt: {prompt}\nnegative_prompt: {negative_prompt}')
+        else:
+          f.write(f'diffuser: {diffuser_key}\nprompt: {prompt}\nnegative_prompt: {negative_prompt}')
+      dir_index = dir_index + 1
