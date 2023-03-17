@@ -153,7 +153,7 @@ with open('config.yaml', 'r') as config_file:
       os.makedirs(os.path.dirname(prompt_file), exist_ok=True)
       with open(f'{prompt_file}', 'w') as f:
         if len(diffuser_keys) > 1:  
-          f.write(f'prompt: {prompt}\nnegative_prompt: {negative_prompt}')
+          f.write(f'prompt: {prompt}\nnegative_prompt: {negative_prompts}')
         else:
-          f.write(f'diffuser: {diffuser_key}\nprompt: {prompt}\nnegative_prompt: {negative_prompt}')
+          f.write(f'diffuser: {diffuser_key}\nprompt: {prompt}\nnegative_prompt: {negative_prompts}')
       dir_index = dir_index + 1
