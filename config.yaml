@@ -14,8 +14,8 @@ tall:
 # starts at 8x8 scale multiplies from there
 # scale 64 is the default 512x512 resolution
 square:
-  enabled: true
-  scale: 128
+  enabled: false
+  scale: 64
 
 # set the height and width manually, generation will fail if either
 # dimension is not divisible by 8.
@@ -23,6 +23,8 @@ manual_resolution:
   enabled: false
   height: 512
   width: 512
+
+# If all the above are set to false, the script will default to 512x512
 
 # each pass will double the height and width of the image
 upscale:
@@ -33,19 +35,15 @@ upscale:
 # protogen, dream2, epic, dream1, er, lowpoly,
 # sci-fi, nitro, sd2, waifu, redshift
 diffusers:
-  - 'er'
   - 'protogen'
-  - 'dream2'
-  - 'epic'
-
 
 # any number of prompts can go here, each prompt is limited to 77 tokens.
 prompts:
-  - 'Design a majestic Lovecraftian-steampunk airship in late Victorian style. Tapered hull, large size, and skyward scene. Four steam-powered pylons with purple aura. Emphasize pipes, valves, and subtle gears. Focus on awe-inspiring, pre-horror introduction'
+  - 'Enter your prompt here'
 
 # this will tell the diffuser to avoid certain things
 negative_prompts:
-  - 'water, balloons, too many gears, gloomy visuals'
+  - "Enter what you don't want here"
   
 # the number of images to generate per prompt
 count: 3
@@ -85,5 +83,5 @@ cooldown:
   # temperature units are ºC
   threshhold: 75
   # the temparature to wait until the GPU cools to before resuming generation tasks.
-  resume_temp: 70
+  resume_temp: 60
 
